@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>JCB Time Billing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body { font-family: sans-serif; background: #fff8dc; display: flex; justify-content: center; padding: 30px; margin: 0; }
+    .container { background: #fffacd; padding: 20px; border-radius: 10px; max-width: 420px; width: 100%; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    h2, h3, h4 { color: #b8860b; text-align: center; }
+    input, select, textarea, button { padding: 10px; margin: 5px; width: 95%; border: 1px solid #d2b48c; border-radius: 5px; }
+    button { background: #ffd700; font-weight: bold; cursor: pointer; }
+    .hidden { display: none; }
+    #printArea { background: #fffacd; color: #000; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; }
+    #printArea h2 { color: #d4af37; text-align: center; }
+    label span { font-size: 14px; margin-left: 6px; color: #555; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container" id="calculator">
+  <h2>JCB Time Calculator</h2>
+
+  <label>Select Language:</label>
+  <select id="lang">
+    <option value="en">English</option>
+    <option value="te">Telugu</option>
+    <option value="hi">Hindi</option>
+    <option value="kn">Kannada</option>
+  </select>
+
+  <label>Start Time <span>(Ex: 12:30 AM)</span>:</label>
+  <div>
+    <input id="sh" type="number" placeholder="Hour (1-12)" min="1" max="12">
+    <input id="sm" type="number" placeholder="Minute (0-59)" min="0" max="59">
+    <select id="sp"><option>AM</option><option>PM</option></select>
+  </div>
+
+  <label>End Time <span>(Ex: 2:45 PM)</span>:</label>
+  <div>
+    <input id="eh" type="number" placeholder="Hour (1-12)" min="1" max="12">
+    <input id="em" type="number" placeholder="Minute (0-59)" min="0" max="59">
+    <select id="ep"><option>AM</option><option>PM</option></select>
+    <label><input type="checkbox" id="nextDay"> <span>Next Day</span></label>
+  </div>
+
+  <label>Any Break/Lunch Break?</label>
+  <select id="hasBreak" onchange="toggleBreak()">
+    <option value="no">No</option>
+    <option value="yes">Yes</option>
+  </select>
+
+  <div id="breakInputs" class="hidden">
+    <label>Break Start Time <span>(Ex: 1:00 PM)</span>:</label>
+    <input id="bsh" type="number" placeholder="Hour (1-12)" min="1" max="12">
+    <input id="bsm" type="number" placeholder="Minute (0-59)" min="0" max="59">
+    <select id="bsp"><option>AM</option><option>PM</option></select>
+
+    <label>Break End Time <span>(Ex: 1:30 PM)</span>:</label>
+    <input id="beh" type="number" placeholder="Hour (1-12)" min="1" max="12">
+    <input id="bem" type="number" placeholder="Minute (0-59)" min="0" max="59">
+    <select id="bep"><option>AM</option><option>PM</option></select>
+  </div>
+
+  <button onclick="calc()">Calculate</button>
+  <div id="res"></div>
+
+  <div id="billForm" class="hidden">
+    <h4>Billing Info</h4>
+    <input id="service" placeholder="Service Name">
+    <input id="servicePhone" placeholder="Your Phone Number">
+    <input id="customer" placeholder="Customer Name">
+    <input id="customerPhone" placeholder="Customer Phone">
+    <textarea id="address" placeholder="Customer Address"></textarea>
+    <input id="rate" type="number" placeholder="Rate per Hour (₹)">
+    <input id="billDate" type="date" placeholder="Billing Date">
+    <button onclick="generateBill()">Generate Bill</button>
+  </div>
+</div>
+
+<div id="printArea" class="hidden"></div>
+
+<script>
+  let totalMins = 0;
+  let breakNote = "No Break";
+  let timeNote = "";
+
+  function to24(h, p) {
+    if (p === "AM" && h === 12) return 0;
+    if (p === "PM" && h !== 12) return h + 12;
+    return h;
+  }
+
+  function toggleBreak() {
+    document.getElementById("breakInputs").classList.toggle("hidden", document.getElementById("hasBreak").value === "no");
+  }
+
+  function calc() {
+    const sh = +document.getElementById("sh").value;
+    const sm = +document.getElementById("sm").value;
+    const sp = document.getElementById("sp").value;
+    const eh = +document.getElementById("eh").value;
+    const em = +document.getElementById("em").value;
+    const ep = document.getElementById("ep").value;
+    const nextDay = document.getElementById("nextDay").checked;
+
+    const startStr = `${sh}:${sm.toString().padStart(2,'0')} ${sp}`;
+    const endStr = `${eh}:${em.toString().padStart(2,'0')} ${ep}`;
+    timeNote = `${startStr} - ${endStr}`;
+
+    let start = to24(sh, sp) * 60 + sm;
+    let end = to24(eh, ep) * 60 + em;
+    if (nextDay || end < start) end += 1440;
+
+    totalMins = end - start;
+    breakNote = "No Break";
+
+    if (document.getElementById("hasBreak").value === "yes") {
+      const bsh = +document.getElementById("bsh").value;
+      const bsm = +document.getElementById("bsm").value;
+      const bsp = document.getElementById("bsp").value;
+      const beh = +document.getElementById("beh").value;
+      const bem = +document.getElementById("bem").value;
+      const bep = document.getElementById("bep").value;
+
+      let bstart = to24(bsh, bsp) * 60 + bsm;
+      let bend = to24(beh, bep) * 60 + bem;
+      if (bend < bstart) bend += 1440;
+
+      const breakDuration = bend - bstart;
+      totalMins -= breakDuration;
+      breakNote = `${bsh}:${bsm.toString().padStart(2, '0')} ${bsp} - ${beh}:${bem.toString().padStart(2, '0')} ${bep}`;
+    }
+
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    document.getElementById("res").innerHTML = `Time: <b>${h} Hours</b> and <b>${m} Minutes</b><br>Break: <b>${breakNote}</b><br><button onclick="document.getElementById('billForm').classList.remove('hidden')">Proceed to Bill</button>`;
+  }
+
+  function generateBill() {
+    const service = document.getElementById("service").value;
+    const servicePhone = document.getElementById("servicePhone").value;
+    const customer = document.getElementById("customer").value;
+    const customerPhone = document.getElementById("customerPhone").value;
+    const address = document.getElementById("address").value;
+    const rate = +document.getElementById("rate").value;
+    const billDate = document.getElementById("billDate").value;
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    const amount = (totalMins / 60) * rate;
+
+    document.getElementById("printArea").classList.remove("hidden");
+    document.getElementById("printArea").innerHTML = `
+      <h2>${service}</h2>
+      <p><b>Service Phone:</b> ${servicePhone}</p>
+      <p><b>Customer:</b> ${customer}</p>
+      <p><b>Phone:</b> ${customerPhone}</p>
+      <p><b>Address:</b> ${address}</p>
+      <p><b>Date:</b> ${billDate}</p>
+      <hr>
+      <p><b>Service Time:</b> ${timeNote}</p>
+      <p><b>Break Time:</b> ${breakNote}</p>
+      <p><b>Total Duration:</b> ${h} Hours ${m} Minutes</p>
+      <p><b>Rate:</b> ₹${rate} per hour</p>
+      <h3>Total Amount: ₹${amount.toFixed(2)}</h3>
+      <button onclick="window.print()">Download Bill</button>
+    `;
+  }
+</script>
+
+</body>
+</html>
